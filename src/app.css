@@ -1,1 +1,9 @@
 @import "tailwindcss";
+
+@theme {
+
+}
+
+body {
+  @apply bg-stone-800 text-stone-200 font-mono text-sm;
+}

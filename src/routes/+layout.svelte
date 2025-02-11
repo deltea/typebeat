@@ -3,4 +3,6 @@
 	let { children } = $props();
 </script>
 
-{@render children()}
+<div class="w-full h-screen">
+  {@render children()}
+</div>
