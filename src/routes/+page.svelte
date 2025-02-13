@@ -65,7 +65,7 @@
       await ffmpeg.writeFile(`frame-${i}.png`, file);
     }
 
-    await ffmpeg.writeFile("audio.mp3", await fetchFile("/audio-2.mp3"));
+    await ffmpeg.writeFile("audio.mp3", await fetchFile("/audio-3.mp3"));
 
     await ffmpeg.exec([
       "-framerate", "30",
