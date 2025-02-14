@@ -2,24 +2,23 @@
   import { FFmpeg } from "@ffmpeg/ffmpeg";
   import { fetchFile } from "@ffmpeg/util";
   import { onMount } from "svelte";
+	import AudioDrop from "$components/AudioDrop.svelte";
+    import ImageDrop from "$components/ImageDrop.svelte";
 
   const ffmpeg = new FFmpeg();
 
-  // ffmpeg.on("log", ({ message }) => console.log(message));
-  ffmpeg.on("progress", ({ progress }) => console.log(progress));
+  ffmpeg.on("progress", ({ progress, time }) => console.log(time, progress));
 
-  const src = ["/test-1.png", "/test-2.png"];
+  const fps = 30;
+
   let bpm = 120;
   let duration = 10;
+  let audio: File | null = null;
+  let state: "audio" | "images" | "video" = "audio";
+  let images: HTMLImageElement[] = [];
 
   let canvas: HTMLCanvasElement;
   let ctx: CanvasRenderingContext2D;
-
-  const images = src.map((src) => {
-    const img = new Image();
-    img.src = src;
-    return img;
-  });
 
   onMount(async () => {
     canvas = document.getElementById("output") as HTMLCanvasElement;
@@ -31,10 +30,9 @@
   });
 
   function renderFrames(images: HTMLImageElement[]) {
-    const fps = 60;
     const totalFrames = duration * fps;
     const framesPerBeat = (60 / bpm) * fps;
-    let nextBeatFrmae = framesPerBeat;
+    let nextBeatFrame = framesPerBeat;
     let currentImageIndex = 0;
 
     const frames = [];
@@ -42,10 +40,10 @@
     if (!ctx) return [];
 
     for (let i = 0; i < totalFrames; i++) {
-      if (i >= nextBeatFrmae) {
+      if (i >= nextBeatFrame) {
         console.log(currentImageIndex);
         currentImageIndex = (currentImageIndex + 1) % images.length;
-        nextBeatFrmae += framesPerBeat;
+        nextBeatFrame += framesPerBeat;
       }
 
       ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -65,10 +63,10 @@
       await ffmpeg.writeFile(`frame-${i}.png`, file);
     }
 
-    await ffmpeg.writeFile("audio.mp3", await fetchFile("/audio-3.mp3"));
+    await ffmpeg.writeFile("audio.mp3", await fetchFile(audio!));
 
     await ffmpeg.exec([
-      "-framerate", "30",
+      "-framerate", `${fps}`,
       "-i", "frame-%d.png",
       "-i", "audio.mp3",
       "-c:v", "libx264",
@@ -86,6 +84,17 @@
     return URL.createObjectURL(videoBlob);
   }
 
+  function onAudioUpload(a: File) {
+    audio = a;
+    state = "images";
+  }
+
+  function onImageUpload(a: HTMLImageElement[]) {
+    console.log(images, a);
+    images = [...images, ...a];
+    // step = "video";
+  }
+
   async function getVideo() {
     const frames = renderFrames(images);
     const videoURL = await generateVideo(frames);
@@ -98,7 +107,7 @@
 
 <main class="flex flex-col justify-center items-center h-full gap-8">
   <div class="space-y-2 text-center">
-    <h1 class="underline font-bold text-lg">typebeat</h1>
+    <h1 class="underline underline-offset-4 font-bold text-lg">typebeat</h1>
     <h2 class="text-stone-500">generate videos with images on beat</h2>
   </div>
 
@@ -125,19 +134,47 @@
 
     <button
       class="bg-stone-700 rounded-md py-2 px-4 cursor-pointer hover:bg-stone-200 hover:text-stone-800"
-      on:click={getVideo}
+      on:click={() => {
+        state = "video";
+        getVideo();
+      }}
     >
       generate!
     </button>
   </div>
 
-  <canvas id="output" class="bg-stone-700 rounded-md aspect-square w-80"></canvas>
+  {#if audio}
+    <p>{audio.name}</p>
+  {/if}
 
-  <a
-    id="download"
-    href="/"
-    class="bg-stone-700 rounded-md py-2 px-4 cursor-pointer hover:bg-stone-200 hover:text-stone-800"
-  >
-    download
-  </a>
+  {#if images.length > 0}
+    <div class="flex gap-4">
+      {#each images as image}
+        <img src={image.src} alt={image.src} class="w-32 h-32" />
+      {/each}
+    </div>
+  {/if}
+
+  {#if state === "audio"}
+    <AudioDrop
+      bind:bpm={bpm}
+      bind:audio={audio}
+      {onAudioUpload}
+    />
+  {:else if state === "images"}
+    <ImageDrop
+      {onImageUpload}
+    />
+  {:else if state === "video"}
+    <a
+      id="download"
+      href="/"
+      class="bg-stone-700 rounded-md py-2 px-4 cursor-pointer hover:bg-stone-200 hover:text-stone-800"
+    >
+      download
+    </a>
+  {/if}
+
+  <!-- Hidden canvas for rendering -->
+  <canvas id="output" class="hidden"></canvas>
 </main>
